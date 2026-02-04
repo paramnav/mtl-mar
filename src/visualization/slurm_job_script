@@ -1,0 +1,13 @@
+#!/bin/bash
+#SBATCH --job-name=infogain100bins
+#SBATCH --nodes=1
+#SBATCH --tasks-per-node=1
+#SBATCH --cpus-per-task=1
+#SBATCH --mem=20000
+#SBATCH --time=06:00:00
+#SBATCH --output=infogain100.out
+#SBATCH --error=infogain100.err
+#SBATCH --partition=base
+
+export OMP_NUM_THREADS=1
+python3 /gxfs_work/cau/sunms498/work/nn4sedratetoc/src/visualization/infoGainRun100bins.py
