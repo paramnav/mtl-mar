@@ -1,24 +1,42 @@
-#!/usr/bin/env python
-# coding: utf-8
+"""
+Hyperparameter optimization for supervised neural network models.
 
-# # Self supervised training
+This script performs hyperparameter optimization for neural network models
+predicting sediment accumulation rates. It tests various network architectures
+and saves the best performing models and their prediction maps.
+"""
 
-# In[661]:
-
+import warnings
+warnings.filterwarnings('ignore')
 
 # Standard library imports
-import os
 import sys
 import random
-import pickle
 from pathlib import Path
+from os import walk
 
 # Third party imports
 import numpy as np
+import pandas as pd
 import torch
-from torch.utils.data import Dataset, TensorDataset, DataLoader
-from sklearn.model_selection import train_test_split
-import matplotlib.pyplot as plt
+import torch.nn as nn
+import torch.nn.functional as F
+from torch.utils.data import DataLoader
+
+# Add project paths
+project_root = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(project_root / "src"))
+from utils import PROJECT_ROOT, DATA_INTERIM, DATA_RAW, DATA_OUTPUT
+
+models_path = project_root / "src" / "models"
+postproc_path = project_root / "src" / "postprocessing"
+sys.path.extend([str(models_path), str(postproc_path)])
+
+# Import project modules
+from train_neural_network import (
+    preprocess_features_labels, split_train_test_data, 
+    create_dataloaders, buildDNN, set_seed
+)
 
 # Set random seeds for reproducibility
 random.seed(42)
@@ -31,24 +49,11 @@ if torch.cuda.is_available():
 torch.backends.cudnn.deterministic = True
 torch.backends.cudnn.benchmark = False
 
-# Add project paths
-project_root = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(project_root / "src"))
-from utils import PROJECT_ROOT, DATA_INTERIM, DATA_RAW, DATA_OUTPUT
+# Set device
+device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+print(f"Using device: {device}")
 
-models_path = project_root / "src" / "models"
-postproc_path = project_root / "src" / "postprocessing"
-sys.path.extend([str(models_path), str(postproc_path)])
-
-# Import project modules
-from trainDNN import *
-from explainDNN import *
-from predictDNN import *
-from getModelPerformance import *
-
-
-set_seed()
-print(device)
+set_seed(42)
 
 # Load world features
 dataset_path = DATA_INTERIM / "worldfeatures" / "WorldFeaturesAllnoNaN_SedTOC_predict_men"
@@ -200,15 +205,13 @@ if world_feature_shape_dim != input_feature_shape_dim:
 print(f"Number of features: {features.shape[1]}")
 
 
-features_DO, labels_DO, lats_DO, lons_DO = preprocess_features_labels(features, labels, lats, lons, X_mean, X_std)
+features_DO, labels_DO, lats_DO, lons_DO = preprocess_features_labels(
+    features, labels, lats, lons, X_mean, X_std
+)
 
-
-from sklearn.model_selection import StratifiedKFold
-
-
+# Split data for training and testing
 test_size_ratio = 0.25
-print("Test size ratio") 
-print(test_size_ratio)
+print(f"Test size ratio: {test_size_ratio}")
 
 # Create bins for stratification
 n_bins = 10
@@ -241,15 +244,13 @@ if world_feature_shape_dim != input_feature_shape_dim:
 print(f"Number of features: {features.shape[1]}")
 
 
-features_CS, labels_CS, lats_CS, lons_CS = preprocess_features_labels(features, labels, lats, lons, X_mean, X_std)
+features_CS, labels_CS, lats_CS, lons_CS = preprocess_features_labels(
+    features, labels, lats, lons, X_mean, X_std
+)
 
-
-from sklearn.model_selection import StratifiedKFold
-
-
+# Split CS data for training and testing
 test_size_ratio = 0.25
-print("Test size ratio") 
-print(test_size_ratio)
+print(f"Test size ratio: {test_size_ratio}")
 
 # Create bins for stratification
 n_bins = 10
@@ -257,14 +258,20 @@ y_binned = pd.qcut(labels_CS, q=n_bins, labels=False, duplicates='drop')
 train_features_CS, train_labels_CS, test_features_CS, test_labels_CS = split_train_test_data(features_CS, labels_CS, test_size_ratio=0.25, random_seed=42, stratify=y_binned)
 #trainloader, testloader = create_dataloaders(train_features, train_labels, test_features, test_labels, batch_size=batch_size, shuffle_train=True, shuffle_test=False)
 
-train_features = np.concatenate([train_features_CS, train_features_DO], axis = 0)
-test_features = np.concatenate([test_features_CS, test_features_DO], axis = 0)
-train_labels = np.concatenate([train_labels_CS, train_labels_DO], axis = 0)
-test_labels = np.concatenate([test_labels_CS, test_labels_DO], axis = 0)
-features = np.concatenate([features_CS, features_DO], axis = 0)
-labels = np.concatenate([labels_CS, labels_DO], axis = 0)
+# Combine CS and DO data
+train_features = np.concatenate([train_features_CS, train_features_DO], axis=0)
+test_features = np.concatenate([test_features_CS, test_features_DO], axis=0)
+train_labels = np.concatenate([train_labels_CS, train_labels_DO], axis=0)
+test_labels = np.concatenate([test_labels_CS, test_labels_DO], axis=0)
+features = np.concatenate([features_CS, features_DO], axis=0)
+labels = np.concatenate([labels_CS, labels_DO], axis=0)
+
+# Create data loaders
 batch_size = 64
-trainloader, testloader = create_dataloaders(train_features, train_labels, test_features, test_labels, batch_size=batch_size, shuffle_train=True, shuffle_test=False)
+trainloader, testloader = create_dataloaders(
+    train_features, train_labels, test_features, test_labels, 
+    batch_size=batch_size, shuffle_train=True, shuffle_test=False
+)
 
 def enable_dropout(model):
     """ Function to enable the dropout layers during test-time """
@@ -274,15 +281,13 @@ def enable_dropout(model):
 
 
 def get_predictions():
-    #os.chdir("/gxfs_work1/cau/sunms498/work/david/NN4SedRatePred/models/MLP/SedRate_MAR/models_torch/")
-
-
-    from os import walk  
-    feature_path = Path(Path() / "/gxfs_work/cau/sunms498/work/nn4sedratetoc/data/interim/inputfeatures/SedTOCFeaturesnoNAN_MAR_CS_men/")
+    """Generate global prediction map using Monte Carlo dropout."""
+    # Load normalization parameters
+    feature_path = DATA_INTERIM / "inputfeatures" / "SedTOCFeaturesnoNAN_MAR_CS_men"
     X_mean = np.load(Path(feature_path / "features_mean.npy")).astype(float)
     X_std = np.load(Path(feature_path / "features_std.npy")).astype(float)
 
-    #dataset_path = Path(Path().resolve().parents[2] / "Data" / "restrepoKNNsTOC" / "WorldFeaturesAll")#ChlorWorldFeatures
+    # Load world features
     dataset_path = DATA_INTERIM / "worldfeatures" / "WorldFeaturesAllnoNaN_SedTOC_predict_men"
     files = []
 
@@ -293,35 +298,21 @@ def get_predictions():
     files.sort()
 
 
-    features = np.load(Path(dataset_path / files[0]))
-    #"""
-    #model = FEA(layer_width)
-    #model.load_state_dict(torch.load("/gxfs_work1/cau/sunms498/work/toc-neural-nets/SelectFeaturesRun/FEAmodel_test0_75.pth"))
-
+    # Set model to evaluation mode with dropout enabled for MC dropout
     model.eval()
-    enable_dropout(model) #for mc dropout
-
-    chunk_shape = [6,4320] #360 chunks
-
+    enable_dropout(model)
+    
+    chunk_shape = [6, 4320]  # 360 chunks
+    
+    # Set seeds for reproducibility
     np.random.seed(42)
     torch.manual_seed(42)
-    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu') #'cuda:0' if torch.cuda.is_available() else 
-    #print(physical_devices)
+    
+    # Move model to device
     model.to(device)
-    print(device)
     model.double()
-
-
-    #"""
+    
     first_run = True
-    ii = 0
-    features = np.load(Path(dataset_path / files[0]))
-
-    chunk_shape = [6,4320] #360 chunks
-
-
-    first_run = True
-    ii = 0
 
     for count, file in enumerate(files):
         features = np.load(Path(dataset_path / file))
@@ -330,16 +321,13 @@ def get_predictions():
         features = torch.tensor(features)
         features = features.to(device)
 
-        # Perform multiple forward passes with dropout
-        num_samples = 100  # Adjust this based on your requirements
+        # Perform multiple forward passes with dropout (Monte Carlo dropout)
+        num_samples = 100
         predictions_sum = np.zeros((num_samples, chunk_shape[0], chunk_shape[1]))
 
         with torch.no_grad():
             for i in range(num_samples):
-                predictions = model(features) #decoded, 
-                #predictions = F.softmax(predictions, dim=1)  # If you're using softmax
-
-                # Store predictions for later averaging
+                predictions = model(features)
                 predictions_sum[i] = predictions.cpu().detach().numpy().reshape(chunk_shape)
 
         # Average predictions over all samples
