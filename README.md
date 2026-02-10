@@ -68,9 +68,9 @@ See `README_DATA_DOWNLOAD.md` for detailed download instructions.
 
 ## Model Types
 
-1. **Neural Networks (NN)**: Feedforward networks with encoder architecture
-2. **Multi-Task Learning (MTL)**: Shared encoder with task-specific heads for MAR and TOC
-3. **Tree-Based Models**: Random Forest, XGBoost, CatBoost, K-Nearest Neighbors
+1. **Deep Learning Models**: TabPFN, Feedforward Neural Networks (NN), and Multi-Task Learning (MTL, shared encoder with task-specific heads for MAR and TOC)
+2. **Tree-Based Models**: Random Forest, XGBoost, CatBoost
+3. **Distance-Based Models**: K-Nearest Neighbors (kNN)
 
 ## Reproducibility
 
@@ -79,8 +79,25 @@ All file paths use relative `Path` objects with `.resolve().parents[X]` for port
 ## Documentation
 
 - `README_DATA_DOWNLOAD.md` - Instructions for downloading data from Zenodo
-- `FILES_ONLY_IN_NN4SEDRATETOC.txt` - List of files that remain in nn4sedratetoc project
 
 ## License
 
-[Add your license information here]
+This project is licensed under the **MIT License**.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
