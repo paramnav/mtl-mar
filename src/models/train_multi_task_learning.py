@@ -185,6 +185,89 @@ def buildDNN(layer_width, features, num_shared_layers):
 
     return model
 
+
+def buildAttentionMTL(
+    features,
+    n_value_features=None,
+    d_model=64,
+    n_heads=4,
+    n_layers=2,
+    ff_mult=2,
+    dropout=0.2,
+):
+    """Feature-token attention MTL (shared encoder + MAR/TOC heads).
+
+    Same ``forward(x, task_id) -> (decoded, task_output)`` contract as
+    :func:`buildDNN`. Paper MTL+attention defaults: ``d_model=128, n_heads=8,
+    n_layers=2, ff_mult=2, dropout=0.2`` on 226-d value+mask inputs.
+    """
+    total_features = int(features.shape[1])
+    if n_value_features is None:
+        n_value_features = total_features // 2 if total_features % 2 == 0 else total_features
+    has_mask = total_features == 2 * n_value_features
+    in_channels = 2 if has_mask else 1
+    head_hidden = max(16, d_model // 2)
+
+    class FeatureTokenAttentionMTL(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.n_value_features = n_value_features
+            self.has_mask = has_mask
+            self.token_embed = nn.Linear(in_channels, d_model)
+            self.pos_embed = nn.Parameter(torch.randn(1, n_value_features, d_model) * 0.02)
+            encoder_layer = nn.TransformerEncoderLayer(
+                d_model=d_model,
+                nhead=n_heads,
+                dim_feedforward=max(ff_mult * d_model, d_model),
+                dropout=dropout,
+                activation="relu",
+                batch_first=True,
+            )
+            self.encoder = nn.TransformerEncoder(encoder_layer, num_layers=n_layers)
+            self.pool_norm = nn.LayerNorm(d_model)
+            self.task_sedimentation_rates_head = nn.Sequential(
+                nn.Linear(d_model, head_hidden),
+                nn.ReLU(),
+                nn.Dropout(dropout),
+                nn.Linear(head_hidden, 1),
+            )
+            self.task_toc_head = nn.Sequential(
+                nn.Linear(d_model, head_hidden),
+                nn.ReLU(),
+                nn.Dropout(dropout),
+                nn.Linear(head_hidden, 1),
+            )
+
+        def _encode(self, x):
+            if self.has_mask:
+                values = x[:, : self.n_value_features]
+                masks = x[:, self.n_value_features :]
+                tokens = torch.stack([values, masks], dim=-1)
+            else:
+                tokens = x[:, : self.n_value_features].unsqueeze(-1)
+            embedded = self.token_embed(tokens) + self.pos_embed
+            encoded = self.encoder(embedded)
+            return self.pool_norm(encoded.mean(dim=1))
+
+        def forward(self, x, task_id):
+            pooled = self._encode(x)
+            if task_id == "sedimentation_rates":
+                task_output = self.task_sedimentation_rates_head(pooled)
+            elif task_id == "toc":
+                task_output = self.task_toc_head(pooled)
+            else:
+                raise ValueError("Invalid task_id. Use sedimentation_rates or toc.")
+            return 0, task_output
+
+    model = FeatureTokenAttentionMTL()
+    model = model.double()
+    initialize_weights(model.token_embed)
+    for head in (model.task_sedimentation_rates_head, model.task_toc_head):
+        for layer in head:
+            initialize_weights(layer)
+    return model
+
+
 def buildDNN2(layer_width, features, num_task_specific_layers):
     class FFNN(nn.Module):
         """Simple FF network with multiple outputs.

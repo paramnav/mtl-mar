@@ -2,9 +2,27 @@ import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_absolute_error
+from sklearn.neighbors import KNeighborsRegressor
 from scipy.stats import pearsonr
 import xgboost as xgb
 import catboost as cb
+
+def train_knn(features_train, labels_train, features_test, labels_test, n_neighbors=6, weights="uniform", random_seed=42):
+    """Train a KNN regressor and return MAE plus predictions."""
+    del random_seed  # KNN has no random_state; kept for API symmetry with tree trainers
+    model = KNeighborsRegressor(
+        n_neighbors=int(n_neighbors),
+        weights=weights,
+        metric="minkowski",
+        p=2,
+    )
+    model.fit(features_train, labels_train)
+    train_predictions = model.predict(features_train)
+    test_predictions = model.predict(features_test)
+    train_mae = mean_absolute_error(labels_train, train_predictions)
+    test_mae = mean_absolute_error(labels_test, test_predictions)
+    return model, train_mae, test_mae, train_predictions, test_predictions
+
 
 def train_tree_based_model(features_train, labels_train, features_test, labels_test, model_type="random_forest", n_estimators=100, max_depth=None, random_seed=42):
     # Initialize the model based on type

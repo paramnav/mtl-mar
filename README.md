@@ -76,9 +76,46 @@ See `README_DATA_DOWNLOAD.md` for detailed download instructions.
 
 All file paths use relative `Path` objects with `.resolve().parents[X]` for portability. The notebooks will work on any machine with the same directory structure.
 
+## Adding new data and regenerating results
+
+**Full guide:** [`docs/RETRAINING_WITH_NEW_DATA.md`](docs/RETRAINING_WITH_NEW_DATA.md)  
+(operator notebook: `notebooks_2/run_models_on_new_data.ipynb`)
+
+### Paper models (all architectures + maps) — one command
+
+After labels / features / NN-imputation are ready:
+
+```bash
+bash notebooks_2/run_all_models.sh            # sbatch RF/XGB/CatBoost, kNN, TabPFN, FFNN, MTL, attention
+bash notebooks_2/run_all_models.sh --list      # show jobs
+bash notebooks_2/run_all_models.sh --local     # run sequentially here
+```
+
+NN ocean-gap fill (when feature grids changed):
+
+```bash
+python scripts/harmonize_ocean_gaps.py
+python scripts/build_masked_model_features.py
+```
+
+### Lightweight pipeline (trees / kNN / optional DNN + HP sweeps)
+
+```bash
+python pipeline/add_data.py --dataset MAR_CS --csv new_points.csv
+python pipeline/run_pipeline.py                 # HP sweeps on by default
+python pipeline/run_pipeline.py --use-existing-features --skip-hp-sweep
+sbatch pipeline/slurm_pipeline.sbatch
+```
+
+See `pipeline/README.md` for flags and `pipeline/output/` layout.
+
 ## Documentation
 
-- `README_DATA_DOWNLOAD.md` - Instructions for downloading data from Zenodo
+- `docs/RETRAINING_WITH_NEW_DATA.md` — new data, new features, NN-imputation, train-all command
+- `notebooks_2/README.md` — publication notebook workflow
+- `README_DATA_DOWNLOAD.md` — Zenodo download
+- `pipeline/README.md` — lightweight automation pipeline
+- `scripts/README_NN_IMPUTATION.md` — NN ocean-gap imputation
 
 ## License
 

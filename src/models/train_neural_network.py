@@ -147,6 +147,73 @@ def buildDNN(layer_width, features):
 
     return model
 
+
+def buildAttentionDNN(
+    features,
+    n_value_features=None,
+    d_model=64,
+    n_heads=4,
+    n_layers=2,
+    ff_mult=2,
+    dropout=0.2,
+):
+    """Feature-token self-attention regressor for value+mask MAR inputs.
+
+    Drop-in for :func:`buildDNN`: flat ``(batch, n_features)`` → ``(batch, 1)``.
+    When ``n_features == 2 * n_value_features``, each token is ``[value, mask]``.
+
+    Paper FFNN+attention defaults: ``d_model=256, n_heads=8, n_layers=3,
+    ff_mult=2, dropout=0.2`` on 226-d (113 values + 113 masks).
+    """
+    total_features = int(features.shape[1])
+    if n_value_features is None:
+        n_value_features = total_features // 2 if total_features % 2 == 0 else total_features
+    has_mask = total_features == 2 * n_value_features
+    in_channels = 2 if has_mask else 1
+
+    class FeatureTokenTransformer(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.n_value_features = n_value_features
+            self.has_mask = has_mask
+            self.token_embed = nn.Linear(in_channels, d_model)
+            self.pos_embed = nn.Parameter(torch.randn(1, n_value_features, d_model) * 0.02)
+            encoder_layer = nn.TransformerEncoderLayer(
+                d_model=d_model,
+                nhead=n_heads,
+                dim_feedforward=max(ff_mult * d_model, d_model),
+                dropout=dropout,
+                activation="relu",
+                batch_first=True,
+            )
+            self.encoder = nn.TransformerEncoder(encoder_layer, num_layers=n_layers)
+            self.pool_norm = nn.LayerNorm(d_model)
+            self.supervised = nn.Sequential(
+                nn.Linear(d_model, max(16, d_model // 2)),
+                nn.ReLU(),
+                nn.Dropout(dropout),
+                nn.Linear(max(16, d_model // 2), 1),
+            )
+
+        def forward(self, x):
+            if self.has_mask:
+                values = x[:, : self.n_value_features]
+                masks = x[:, self.n_value_features :]
+                tokens = torch.stack([values, masks], dim=-1)
+            else:
+                tokens = x[:, : self.n_value_features].unsqueeze(-1)
+            embedded = self.token_embed(tokens) + self.pos_embed
+            encoded = self.encoder(embedded)
+            pooled = self.pool_norm(encoded.mean(dim=1))
+            return self.supervised(pooled)
+
+    model = FeatureTokenTransformer()
+    model = model.double()
+    initialize_weights(model.token_embed)
+    for layer in model.supervised:
+        initialize_weights(layer)
+    return model
+
 # Lists to track training metrics
 training_accuracy = []
 training_losses = []
@@ -545,7 +612,15 @@ def create_train_test_loader(features, labels, batch_size = 200, test_size_ratio
 
     return trainloader, testloader
 
-def train_model(model, loss_fn, trainloader, testloader, num_epochs=500):
+def train_model(
+    model,
+    loss_fn,
+    trainloader,
+    testloader,
+    num_epochs=500,
+    lr=0.01,
+    weight_decay=0.0,
+):
     """
     Train the model.
 
@@ -557,13 +632,16 @@ def train_model(model, loss_fn, trainloader, testloader, num_epochs=500):
     test_loader: DataLoader for test data.
     train_step (int): Training step (default: 2).
     num_epochs (int): Number of epochs for training (default: 500).
+    lr (float): Adam learning rate (default 0.01 for legacy FFNN notebooks;
+        paper attention / nn4sedratetoc use 1e-4).
+    weight_decay (float): Adam L2 penalty (paper attention uses 1e-4).
     """
     train_step = 2
     # Freeze the parameters of the decoder
     #for param in model.decoder.parameters():
     #     param.requires_grad = False
 
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
 
     lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.8, 
                                                           patience=50, threshold=0.0001, threshold_mode='rel', 
