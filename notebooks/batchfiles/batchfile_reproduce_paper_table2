@@ -1,0 +1,38 @@
+#!/bin/bash
+# Install paper Table-2 prediction maps + SI scatter plots into mtl-mar.
+# Also re-fits trees/KNN (seed=42) and scores FFNN/MTL/attention checkpoints.
+#
+# Submit from anywhere:
+#   sbatch /gxfs_work/cau/sunms498/work/mtl-mar/notebooks/batchfiles/batchfile_reproduce_paper_table2
+#
+#SBATCH --job-name=mtlmar_table2
+#SBATCH --nodes=1
+#SBATCH --tasks-per-node=1
+#SBATCH --cpus-per-task=8
+#SBATCH --mem=64000
+#SBATCH --time=06:00:00
+#SBATCH --output=/gxfs_work/cau/sunms498/work/mtl-mar/notebooks/outfiles/reproduce_paper_table2_%j.out
+#SBATCH --error=/gxfs_work/cau/sunms498/work/mtl-mar/notebooks/errfiles/reproduce_paper_table2_%j.err
+#SBATCH --partition=base
+
+set -euo pipefail
+export OMP_NUM_THREADS=1
+export PYTHONUNBUFFERED=1
+export MPLBACKEND=Agg
+export MASKED_FEATURE_VARIANT=values_only
+
+ROOT=/gxfs_work/cau/sunms498/work/mtl-mar
+cd "$ROOT"
+
+PY="${PYTORCH_PYTHON:-${HOME}/.conda/envs/pytorch/bin/python}"
+echo "=== reproduce_paper_table2 started: $(date) ==="
+echo "Node: $(hostname)  Job: ${SLURM_JOB_ID:-local}"
+echo "Python: $PY"
+
+"$PY" -u notebooks/reproduce_paper_table2.py
+
+echo "=== Outputs ==="
+ls -la data/output/predictionmaps_SedRate/notebooks_paper_table2/ | head
+ls data/output/predictionmaps_SedRate/notebooks_paper_table2/scatters/si_paper/ 2>/dev/null | head
+ls data/output/predictionmaps_SedRate/notebooks_paper_table2/maps_paper_names/ 2>/dev/null | head
+echo "=== finished: $(date) ==="

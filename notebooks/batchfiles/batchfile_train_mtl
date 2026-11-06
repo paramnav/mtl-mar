@@ -1,0 +1,25 @@
+#!/bin/bash
+#SBATCH --job-name=mtlmar_mtl
+#SBATCH --nodes=1
+#SBATCH --tasks-per-node=1
+#SBATCH --cpus-per-task=4
+#SBATCH --gpus-per-node=1
+#SBATCH --mem=64000
+#SBATCH --time=36:00:00
+#SBATCH --output=/gxfs_work/cau/sunms498/work/mtl-mar/notebooks/outfiles/train_mtl_%j.out
+#SBATCH --error=/gxfs_work/cau/sunms498/work/mtl-mar/notebooks/errfiles/train_mtl_%j.err
+#SBATCH --partition=gpu
+set -euo pipefail
+export OMP_NUM_THREADS=1 PYTHONUNBUFFERED=1 MPLBACKEND=Agg
+export MASKED_FEATURE_VARIANT=values_only
+ROOT=/gxfs_work/cau/sunms498/work/mtl-mar
+PY="${PYTORCH_PYTHON:-${HOME}/.conda/envs/pytorch/bin/python}"
+export PATH="$(dirname "$PY"):$PATH"
+mkdir -p "/gxfs_work/cau/sunms498/work/mtl-mar/notebooks/outfiles" "/gxfs_work/cau/sunms498/work/mtl-mar/notebooks/errfiles"
+cd "/gxfs_work/cau/sunms498/work/mtl-mar/notebooks"
+echo "=== train_multi_task_learning.ipynb started: $(date) ==="
+"$PY" -c "import torch; print('cuda', torch.cuda.is_available())"
+"$PY" -m jupyter nbconvert --to notebook --execute --inplace \
+  --ExecutePreprocessor.timeout=86400 --ExecutePreprocessor.kernel_name=python3 \
+  train_multi_task_learning.ipynb
+echo "=== finished: $(date) ==="

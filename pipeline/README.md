@@ -7,7 +7,7 @@ For the **full paper model suite** (TabPFN, MTL, attention, …) and NN-imputati
 prefer `docs/RETRAINING_WITH_NEW_DATA.md` and:
 
 ```bash
-bash notebooks_2/run_all_models.sh
+bash notebooks/run_all_models.sh
 ```
 
 This `pipeline/` path is the lightweight route (trees / kNN / optional DNN + HP sweeps).

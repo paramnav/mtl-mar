@@ -7,7 +7,7 @@ There are **two** related paths:
 
 | Path | When to use | Entry point |
 |------|-------------|-------------|
-| **A. Paper workflow (`notebooks_2/`)** | Reproduce or update *all* manuscript models (RF, XGB, CatBoost, kNN, TabPFN, FFNN, MTL, attention) and maps | `notebooks_2/run_all_models.sh` |
+| **A. Paper workflow (`notebooks/`)** | Reproduce or update *all* manuscript models (RF, XGB, CatBoost, kNN, TabPFN, FFNN, MTL, attention) and maps | `notebooks/run_all_models.sh` |
 | **B. Lightweight pipeline (`pipeline/`)** | Quickly add points, rebuild site features, tree/KNN (+ optional FFNN) with HP sweeps into `pipeline/output/` | `python pipeline/run_pipeline.py` |
 
 Do **not** mix them for one analysis: Path A writes under `data/output/` via the train notebooks; Path B isolates outputs under `pipeline/output/`.
@@ -18,7 +18,7 @@ Do **not** mix them for one analysis: Path A writes under `data/output/` via the
 
 ### A.1 Checklist when labels or feature rasters change
 
-1. **Labels** — `notebooks_2/collect_SR_MAR_datapoints.ipynb`  
+1. **Labels** — `notebooks/collect_SR_MAR_datapoints.ipynb`  
    Rebuild CS/DO MAR (and TOC if needed) observation tables.
 
 2. **Site features** —  
@@ -36,7 +36,7 @@ Do **not** mix them for one analysis: Path A writes under `data/output/` via the
    python scripts/build_masked_model_features.py
    ```
 
-   Or run `notebooks_2/nn_feature_cross_imputation.ipynb` with  
+   Or run `notebooks/nn_feature_cross_imputation.ipynb` with  
    `RUN_HARMONIZE=True` and `RUN_BUILD_PRODUCTS=True`.  
    Details: `scripts/README_NN_IMPUTATION.md`.
 
@@ -48,15 +48,15 @@ Do **not** mix them for one analysis: Path A writes under `data/output/` via the
 
    ```bash
    cd /path/to/mtl-mar
-   bash notebooks_2/run_all_models.sh            # SLURM: submit all jobs
-   bash notebooks_2/run_all_models.sh --list      # dry-run
-   bash notebooks_2/run_all_models.sh --local     # sequential on current node
-   bash notebooks_2/run_all_models.sh --trees-only
-   bash notebooks_2/run_all_models.sh --gpu-only
+   bash notebooks/run_all_models.sh            # SLURM: submit all jobs
+   bash notebooks/run_all_models.sh --list      # dry-run
+   bash notebooks/run_all_models.sh --local     # sequential on current node
+   bash notebooks/run_all_models.sh --trees-only
+   bash notebooks/run_all_models.sh --gpu-only
    ```
 
-   Individual legacy batchfiles remain under `notebooks_2/batchfiles/`.  
-   Interactive guide: `notebooks_2/run_models_on_new_data.ipynb`.
+   Individual legacy batchfiles remain under `notebooks/batchfiles/`.  
+   Interactive guide: `notebooks/run_models_on_new_data.ipynb`.
 
 ### A.2 Hyperparameter search
 
@@ -75,9 +75,9 @@ Do **not** mix them for one analysis: Path A writes under `data/output/` via the
 Same checkpoints / SI maps as the paper (no retraining from scratch):
 
 ```bash
-sbatch notebooks_2/batchfiles/batchfile_reproduce_paper_table2
+sbatch notebooks/batchfiles/batchfile_reproduce_paper_table2
 # or
-python notebooks_2/reproduce_paper_table2.py
+python notebooks/reproduce_paper_table2.py
 ```
 
 ---
@@ -116,10 +116,10 @@ See `pipeline/README.md` for flags and output layout.
 ```bash
 # 1–4: rebuild labels/features/imputation (notebooks or scripts above)
 # 5: train everything at paper HPs
-bash notebooks_2/run_all_models.sh
+bash notebooks/run_all_models.sh
 
 # watch GPU jobs
-tail -f notebooks_2/outfiles/train_*_*.out
+tail -f notebooks/outfiles/train_*_*.out
 ```
 
 Inspect maps and metrics under `data/output/`, then update paper figures if the new maps are adopted.

@@ -1,0 +1,16 @@
+#!/bin/bash
+#SBATCH --job-name=mtlmar_ig
+#SBATCH --nodes=1
+#SBATCH --tasks-per-node=1
+#SBATCH --cpus-per-task=4
+#SBATCH --gpus-per-node=1
+#SBATCH --mem=64000
+#SBATCH --time=48:00:00
+#SBATCH --output=/gxfs_work/cau/sunms498/work/mtl-mar/notebooks/outfiles/mtl_infogain_%j.out
+#SBATCH --error=/gxfs_work/cau/sunms498/work/mtl-mar/notebooks/errfiles/mtl_infogain_%j.err
+#SBATCH --partition=gpu
+set -euo pipefail
+export OMP_NUM_THREADS=1 PYTHONUNBUFFERED=1 MASKED_FEATURE_VARIANT=values_only
+PY="${PYTORCH_PYTHON:-${HOME}/.conda/envs/pytorch/bin/python}"
+cd /gxfs_work/cau/sunms498/work/nn4sedratetoc/notebooks/SedRate
+"$PY" Sed_MTL_infogain_nomask_map47.py --skip-train

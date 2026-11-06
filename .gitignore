@@ -1,11 +1,13 @@
-# Data folder
+# Data folder (large files — downloaded from Zenodo)
 data/
 
-# Python
+# Python bytecode
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
+
+# Build / packaging
 .Python
 build/
 develop-eggs/
@@ -23,10 +25,8 @@ wheels/
 .installed.cfg
 *.egg
 
-# NumPy array files
+# Binary data files
 *.npy
-
-# MATLAB files
 *.mat
 
 # Virtual environments
@@ -36,8 +36,7 @@ ENV/
 .venv
 
 # Jupyter Notebook
-.ipynb_checkpoints
-*.ipynb_checkpoints
+.ipynb_checkpoints/
 
 # IDE
 .vscode/
@@ -50,10 +49,14 @@ ENV/
 .DS_Store
 Thumbs.db
 
-# Logs
+# Logs and temp
 *.log
-
-# Temporary files
 *.tmp
 *.temp
 
+# SLURM output logs (kept locally, not in repo)
+notebooks/outfiles/
+notebooks/errfiles/
+
+# CatBoost artifacts
+catboost_info/

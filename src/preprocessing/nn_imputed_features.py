@@ -1,5 +1,5 @@
 """
-NN-imputed (values-only) feature loading for mtl-mar notebooks_2.
+NN-imputed (values-only) feature loading for mtl-mar notebooks.
 
 Paper pipeline uses ``*_men_masked`` products (113 value channels + 113 mask
 bits) but models see **values only** (113-d NN-imputed predictors). Prefer
