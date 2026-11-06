@@ -7,297 +7,351 @@
 > *Global Prediction of Mass Accumulation Rates of Sediments and Organic Carbon Turnover Using Multi-Task Learning.*
 > Global Biogeochemical Cycles (2026).
 
-This repository trains and evaluates machine-learning models that predict
+---
+
+## What does this code do?
+
+This repository contains all the code used to produce the global maps of
 **marine mass accumulation rate (MAR)** and **total organic carbon (TOC)**
-in surface sediments from a stack of 113 environmental features on a
-global 5′ × 5′ ocean grid. The selected model is a **multi-task learning
-(MTL) neural network** that jointly predicts MAR and TOC with hard
-parameter sharing; tree-based models, k-NN, TabPFN, feed-forward neural
-networks (FFNN), and attention-based tabular encoders are included for
-comparison.
+presented in the paper. Starting from 113 environmental input layers
+(bathymetry, ocean temperature, sediment thickness, wave climate, etc.)
+and ~13,000 MAR measurements from sediment cores, the code trains machine
+learning models that predict MAR at every 5′ × 5′ ocean grid cell worldwide.
+
+Nine different model types are compared; the best-performing model is a
+**multi-task learning (MTL) neural network** that predicts MAR and TOC
+simultaneously. All models, evaluation plots, and global prediction maps
+can be reproduced from this repository.
 
 ---
 
 ## Table of Contents
 
-1. [Repository Structure](#repository-structure)
-2. [Quick Start](#quick-start)
-3. [Data Requirements](#data-requirements)
-4. [Workflow Overview](#workflow-overview)
-5. [Training Models](#training-models)
-6. [Key Figures](#key-figures)
-7. [Retraining with New Data](#retraining-with-new-data)
-8. [Lightweight Pipeline](#lightweight-pipeline)
-9. [Reproducibility Notes](#reproducibility-notes)
+1. [What you need before starting](#what-you-need-before-starting)
+2. [How the code is organised](#how-the-code-is-organised)
+3. [Getting started — step by step](#getting-started--step-by-step)
+4. [The five-step workflow (how to reproduce everything)](#the-five-step-workflow)
+5. [What each model is and where to find it](#what-each-model-is-and-where-to-find-it)
+6. [What outputs and figures are produced](#what-outputs-and-figures-are-produced)
+7. [How to retrain the models with new data](#how-to-retrain-the-models-with-new-data)
+8. [Quick-update pipeline (for adding a few new cores)](#quick-update-pipeline)
+9. [Notes on reproducibility](#notes-on-reproducibility)
 10. [License](#license)
 
 ---
 
-## Repository Structure
+## What you need before starting
+
+| Requirement | What it is | How to check |
+|---|---|---|
+| **Python 3.9+** | The programming language the code is written in | Type `python --version` in a terminal |
+| **pip** | Python's package installer (comes with Python) | `pip --version` |
+| **Jupyter Notebook** | An interactive environment for running code in step-by-step cells; all analysis is done in notebooks (`.ipynb` files) | `jupyter --version` |
+| **A terminal** | The text-based command prompt on your computer (called *Terminal* on Mac/Linux, *Command Prompt* or *Anaconda Prompt* on Windows) | — |
+| **GPU *(recommended)*** | A graphics processing unit; the neural network models train much faster with one (NVIDIA GPU with CUDA) | `nvidia-smi` |
+| **SLURM *(optional)*** | A job scheduler found on many university computing clusters; lets you submit long-running training jobs to a shared machine | `squeue --version` |
+
+> **No GPU or cluster?** All models can also be run on a regular laptop
+> (slower for neural networks, but the tree-based models finish within hours).
+
+---
+
+## How the code is organised
+
+The repository has four main folders. Think of them as:
 
 ```
 mtl-mar/
 │
-├── notebooks/                        # Jupyter notebooks — the main entry point
-│   ├── collect_SR_MAR_datapoints.ipynb        # Step 1: Compile MAR/TOC labels
-│   ├── create_training_features_CS.ipynb      # Step 2a: Site features (continental shelf)
-│   ├── create_training_features_DO.ipynb      # Step 2b: Site features (deep ocean)
-│   ├── modify_features.ipynb                  # Step 2c: Optional feature edits
-│   ├── Make_Global_Features.ipynb             # Step 3: Global 5′×5′ feature grids
-│   ├── nn_feature_cross_imputation.ipynb      # Step 4: NN ocean-gap imputation
-│   ├── train_tree_based_models.ipynb          # Step 5: RF, XGBoost, CatBoost
-│   ├── train_knn.ipynb                        # Step 5: k-Nearest Neighbors
-│   ├── train_tabpfn.ipynb                     # Step 5: TabPFN
-│   ├── train_neural_network.ipynb             # Step 5: Feed-forward NN (FFNN)
-│   ├── train_multi_task_learning.ipynb        # Step 5: MTL (selected model)
-│   ├── train_neural_network_attention.ipynb   # Step 5: FFNN + attention
-│   ├── train_multi_task_learning_attention.ipynb  # Step 5: MTL + attention
-│   ├── run_models_on_new_data.ipynb           # Interactive checklist for retraining
-│   ├── run_all_models.sh                      # One-command SLURM submission for all models
-│   ├── reproduce_paper_table2.py              # Reinstall archived Table 2 products
-│   ├── paper_train_runtime.py                 # Shared training/eval helpers
-│   ├── paper_results_display.py               # Map and figure plotting helpers
-│   ├── embed_hp_results_into_notebooks.py     # Embed HP search outputs into notebooks
-│   ├── batchfiles/                            # Individual SLURM job scripts
-│   └── README.md                              # Notebook-specific workflow details
+├── notebooks/      ← START HERE: Jupyter notebooks that walk you through
+│                     each step, from data preparation to model training
 │
-├── scripts/                          # Standalone Python scripts
-│   ├── harmonize_ocean_gaps.py                # Driver: NN imputation of ocean NaNs
-│   ├── build_masked_model_features.py         # Build training arrays with fill indicators
-│   ├── nn_feature_imputation.py               # Per-feature MLP imputer core
-│   ├── ml_feature_imputation.py               # Shared cube/native-mask helpers
-│   ├── spatial_interpolation.py               # Polar IDW / nearest fallback
-│   ├── mask_gap_core.py                       # Gap detection and mask I/O
-│   ├── feature_update_core.py                 # Feature stack paths + r50km helpers
-│   ├── build_interpolation_masks.py           # Fill-indicator stack
-│   ├── recompute_feature_stats.py             # Native-ocean mean/std
-│   ├── rebuild_harmonized_feature_products.py # Site arrays + world chunks
-│   └── README_NN_IMPUTATION.md                # NN imputation documentation
+├── scripts/        ← Helper programs called by the notebooks (you rarely
+│                     need to open these directly)
 │
-├── src/                              # Reusable Python library modules
-│   ├── preprocessing/
-│   │   ├── makeTrainingFeatures.py            # Feature extraction for training sites
-│   │   ├── makeGlobalFeatures.py              # Global feature grid generation
-│   │   ├── masked_features.py                 # Feature loading with mask variants
-│   │   ├── nn_imputed_features.py             # NN-imputed feature path resolution
-│   │   └── men_r50km.py                       # Spatial averaging (50 km radius)
-│   ├── models/
-│   │   ├── train_neural_network.py            # FFNN training + evaluation
-│   │   ├── train_multi_task_learning.py       # MTL training + evaluation
-│   │   ├── train_tree_based_models.py         # Tree model wrappers
-│   │   ├── tree_based_models.py               # RF/XGB/CatBoost core
-│   │   ├── predict_neural_network.py          # NN prediction helpers
-│   │   ├── explain_multi_task_learning.py     # SHAP / feature importance (MTL)
-│   │   └── explain_neural_network.py          # SHAP / feature importance (FFNN)
-│   ├── postprocessing/
-│   │   ├── evaluate_model_performance.py      # Metrics (MAE, CC, R², budgets)
-│   │   ├── visualize_prediction_map.py        # Map plotting (Robinson projection)
-│   │   ├── convert_to_xarray.py               # Export to NetCDF / xarray
-│   │   └── curve_fitting.py                   # Distribution fitting
-│   ├── download_data_from_zenodo.py           # Zenodo data download
-│   └── utils.py                               # Shared utilities
+├── src/            ← Reusable code libraries that the notebooks and scripts
+│                     import behind the scenes
 │
-├── pipeline/                         # Lightweight automation pipeline
-│   ├── add_data.py                            # Append new MAR/TOC observations
-│   ├── run_pipeline.py                        # One-command: features → train → maps
-│   ├── step1_build_features.py                # Extract site features
-│   ├── step2_train_and_evaluate.py            # Tree/kNN training + evaluation
-│   ├── step3_train_dnn.py                     # Optional DNN (MLP or attention)
-│   ├── config.py                              # Paths, paper defaults, HP grids
-│   ├── slurm_pipeline.sbatch                  # SLURM job wrapper
-│   └── README.md                              # Pipeline flags and usage
+├── pipeline/       ← A shortcut for quick updates: add new observations
+│                     and retrain tree-based models in one command
 │
-├── data/                             # All data (raw, interim, output) — gitignored
-│   ├── raw/
-│   │   ├── features/                          # Environmental raster layers (from Zenodo)
-│   │   ├── labels/                            # MAR/TOC observation CSVs
-│   │   └── island_map.npy                     # Land/ocean mask
-│   ├── interim/
-│   │   ├── inputfeatures/                     # Site-level training arrays
-│   │   ├── worldfeatures/                     # Global prediction grid chunks
-│   │   └── masks/                             # Interpolation/gap masks
-│   └── output/
-│       ├── predictionmaps_SedRate/            # Global MAR maps (.npy + .png)
-│       ├── model_metrics/                     # JSON / CSV metrics
-│       └── nc/                                # NetCDF exports
+├── data/           ← All data files (downloaded separately — see below)
 │
-├── docs/
-│   └── RETRAINING_WITH_NEW_DATA.md            # Full operator guide
+├── docs/           ← Additional documentation
 │
-├── _archive/                         # Legacy code preserved for provenance
-│   ├── notebooks_v1/                          # Original notebook versions
-│   └── python_files/                          # Standalone training scripts (superseded)
+└── _archive/       ← Older code versions kept for reference (not needed)
+```
+
+### What is in `notebooks/`?
+
+Each notebook corresponds to one step in the workflow. They are meant to
+be opened in Jupyter and run cell by cell (or all at once).
+
+| Notebook | Purpose |
+|----------|---------|
+| `collect_SR_MAR_datapoints.ipynb` | **Step 1.** Gathers all the MAR and TOC measurements from raw databases into clean tables |
+| `create_training_features_CS.ipynb` | **Step 2a.** For each continental-shelf measurement site, extracts the 113 environmental values (temperature, depth, sediment thickness, etc.) |
+| `create_training_features_DO.ipynb` | **Step 2b.** Same as above, but for deep-ocean sites |
+| `modify_features.ipynb` | *(Optional)* Add, remove, or rename environmental input layers |
+| `Make_Global_Features.ipynb` | **Step 3.** Builds the global 5′ × 5′ grid of all 113 environmental layers used for prediction |
+| `nn_feature_cross_imputation.ipynb` | **Step 4.** Fills gaps in the environmental grids (e.g., missing data under sea ice or clouds) using a neural network |
+| `train_tree_based_models.ipynb` | **Step 5.** Trains Random Forest, XGBoost, and CatBoost models |
+| `train_knn.ipynb` | **Step 5.** Trains the k-Nearest Neighbors model |
+| `train_tabpfn.ipynb` | **Step 5.** Runs the pre-trained TabPFN model |
+| `train_neural_network.ipynb` | **Step 5.** Trains a feed-forward neural network (FFNN) |
+| **`train_multi_task_learning.ipynb`** | **Step 5. ★ This is the main model** — trains the MTL neural network that predicts MAR and TOC together |
+| `train_neural_network_attention.ipynb` | **Step 5.** Trains an attention-based neural network variant |
+| `train_multi_task_learning_attention.ipynb` | **Step 5.** Trains an attention-based MTL variant |
+| `run_models_on_new_data.ipynb` | A guided checklist for retraining when you have new data |
+
+**Helper files** (you do not need to open these — the notebooks use them automatically):
+- `run_all_models.sh` — a shell script that submits all training jobs to a computing cluster at once
+- `paper_train_runtime.py`, `paper_results_display.py` — shared code used by the training notebooks
+- `reproduce_paper_table2.py` — reinstalls the exact Table 2 results from saved model files
+- `batchfiles/` — individual cluster job scripts for each model
+
+### What is in `scripts/`?
+
+These are standalone programs for the ocean-gap filling step (Step 4).
+The two most important ones are:
+
+| Script | Purpose |
+|--------|---------|
+| `harmonize_ocean_gaps.py` | Fills missing values in the environmental grids using a neural-network method (described in the paper, Section 2.1 and Supporting Information Text S1) |
+| `build_masked_model_features.py` | Assembles the final training arrays that the models will use |
+
+Full details: [`scripts/README_NN_IMPUTATION.md`](scripts/README_NN_IMPUTATION.md)
+
+### What is in `src/`?
+
+Library code imported by the notebooks. Organised into three subfolders:
+
+- **`preprocessing/`** — code for reading environmental raster files, building training feature tables, and computing spatial averages
+- **`models/`** — the actual model training and prediction logic (neural networks, tree-based models)
+- **`postprocessing/`** — code for evaluating model performance (error metrics, scatter plots, global map visualisation, NetCDF export)
+
+### What is in `data/`?
+
+All data files. **This folder is not included in the repository download**
+because the files are too large; you must download them separately from Zenodo (see below).
+
+```
+data/
+├── raw/            ← Original input data (from Zenodo)
+│   ├── features/   ← 113 environmental raster layers (NetCDF/GRD files)
+│   ├── labels/     ← MAR and TOC measurement tables (CSV files)
+│   └── island_map.npy  ← Land/ocean mask
 │
-├── setup_project.py                  # Complete environment setup
-├── requirements.txt                  # Python dependencies
-├── README_DATA_DOWNLOAD.md           # Zenodo download instructions
-└── .gitignore
+├── interim/        ← Intermediate files created during processing
+│   ├── inputfeatures/   ← Feature arrays at measurement sites
+│   ├── worldfeatures/   ← Feature arrays for the full global grid
+│   └── masks/           ← Which grid cells had missing data
+│
+└── output/         ← Final results
+    ├── predictionmaps_SedRate/  ← Global MAR maps (images + data files)
+    └── model_metrics/           ← Performance numbers (MAE, R², etc.)
 ```
 
 ---
 
-## Quick Start
+## Getting started — step by step
 
-### 1. Clone and install
+### Step 1: Download the code
+
+Open a terminal and type:
 
 ```bash
 git clone https://github.com/paramnav/mtl-mar.git
 cd mtl-mar
+```
+
+> **What does this do?** `git clone` downloads a copy of the entire
+> code repository to your computer. `cd` ("change directory") moves
+> into the downloaded folder.
+
+### Step 2: Install Python packages
+
+```bash
 pip install -r requirements.txt
 ```
 
-### 2. Download data from Zenodo
+> **What does this do?** `pip install -r requirements.txt` reads the
+> file `requirements.txt` (which lists all the software libraries
+> this project needs — NumPy, PyTorch, scikit-learn, etc.) and installs
+> them automatically.
 
-Raw features and labels must be downloaded before running any notebooks.
-See [`README_DATA_DOWNLOAD.md`](README_DATA_DOWNLOAD.md) for details.
+### Step 3: Download the data
+
+The environmental raster layers and observation labels are archived on Zenodo.
 
 ```bash
 python setup_project.py
 ```
 
-### 3. Run the selected MTL model
+> **What does this do?** This script downloads the data files from
+> Zenodo and places them in the correct `data/` subfolders. It may
+> take a while depending on your internet connection (several GB).
+> See [`README_DATA_DOWNLOAD.md`](README_DATA_DOWNLOAD.md) for manual
+> download instructions if the script does not work.
+
+### Step 4: Open a notebook
 
 ```bash
-# Option A: run a single notebook interactively
-jupyter notebook notebooks/train_multi_task_learning.ipynb
-
-# Option B: submit all paper models to SLURM
-bash notebooks/run_all_models.sh
+jupyter notebook
 ```
+
+> **What does this do?** This opens the Jupyter Notebook interface in
+> your web browser. Navigate to the `notebooks/` folder and open any
+> `.ipynb` file. Each notebook contains explanatory text alongside
+> the code — you can run it cell by cell using `Shift + Enter`.
 
 ---
 
-## Data Requirements
+## The five-step workflow
 
-| Data | Source | Location after download |
-|------|--------|------------------------|
-| Environmental feature rasters (113 layers) | [Zenodo archive](https://doi.org/10.5281/zenodo.18591773) | `data/raw/features/` |
-| MAR observation labels | Zenodo | `data/raw/labels/sedrate_continentalshelves.csv`, `sedrate_deep.csv` |
-| Land/ocean mask | Zenodo | `data/raw/island_map.npy` |
+To reproduce every result from scratch, run the notebooks **in order**.
+Each step builds on the outputs of the previous one.
 
-Feature layers include bathymetry (ETOPO 2022), sediment thickness (GlobSed v3),
-ocean hydrography (WOA23, HYCOM, MIMOC), ocean color (VIIRS/SNPP),
-surface wind (ERA5), wave climate (WAVEWATCH III), tidal currents (EOT20),
-lithology (Garlan, Diesing), river carbon fluxes (Liu et al. 2024),
-biomass (Wei), and others. See the paper Supporting Information Table S1
-for the complete list with native resolution and gap-fill method.
+### Step 1 — Collect measurement labels
 
----
+> **Notebook:** `notebooks/collect_SR_MAR_datapoints.ipynb`
 
-## Workflow Overview
+Reads the raw MAR and TOC observation databases and creates clean
+tables of measurement sites with their coordinates and values.
 
-The end-to-end pipeline has five stages, executed through the Jupyter
-notebooks in `notebooks/`:
+### Step 2 — Build site features
 
-```
-┌───────────────────────────────────────────────────────────────────┐
-│  1. Collect labels              collect_SR_MAR_datapoints.ipynb   │
-│  2. Build site features         create_training_features_{CS,DO}  │
-│  3. Build global feature grids  Make_Global_Features.ipynb        │
-│  4. NN ocean-gap imputation     scripts/harmonize_ocean_gaps.py   │
-│                                 scripts/build_masked_model_features│
-│  5. Train + evaluate + map      train_*.ipynb or run_all_models.sh│
-└───────────────────────────────────────────────────────────────────┘
-```
+> **Notebooks:** `notebooks/create_training_features_CS.ipynb` and
+> `notebooks/create_training_features_DO.ipynb`
 
-### Step-by-step
+For each measurement site, reads the 113 environmental layers
+(ocean temperature, seafloor depth, sediment thickness, wave height, etc.)
+and extracts the value at that location. This produces the
+"training data" — a table where each row is one site and the columns
+are the environmental values plus the measured MAR.
 
-| Step | Notebook / Script | What it does |
-|------|-------------------|-------------|
-| 1 | `notebooks/collect_SR_MAR_datapoints.ipynb` | Compile MAR (and TOC) measurements from raw observation databases into site-level CSVs |
-| 2a | `notebooks/create_training_features_CS.ipynb` | Extract the 113-feature vector at each continental-shelf MAR site |
-| 2b | `notebooks/create_training_features_DO.ipynb` | Same for deep-ocean sites |
-| 2c | `notebooks/modify_features.ipynb` | *(Optional)* add, remove, or rename features |
-| 3 | `notebooks/Make_Global_Features.ipynb` | Resample all environmental layers onto the 5′ × 5′ prediction grid |
-| 4a | `python scripts/harmonize_ocean_gaps.py` | Per-feature NN cross-imputation of ocean NaN gaps (GPU recommended) |
-| 4b | `python scripts/build_masked_model_features.py` | Build training arrays (113 values + 113 fill indicators) |
-| 5 | `notebooks/train_*.ipynb` | Train each ML model, produce scatter plots, global prediction maps, and metrics |
+- **CS** = continental shelf sites (water depth ≤ 200 m)
+- **DO** = deep ocean sites (water depth > 200 m)
 
----
+### Step 3 — Build global feature grids
 
-## Training Models
+> **Notebook:** `notebooks/Make_Global_Features.ipynb`
 
-The following models are trained and compared in the paper:
+Resamples all 113 environmental layers onto a common 5-arc-minute
+(~9 km) global ocean grid. This is the grid on which the trained
+models will make predictions.
 
-| Model | Notebook | Selected hyperparameters |
-|-------|----------|--------------------------|
-| Random Forest | `train_tree_based_models.ipynb` | 700 trees |
-| XGBoost | `train_tree_based_models.ipynb` | 1000 trees |
-| CatBoost | `train_tree_based_models.ipynb` | 1000 trees |
-| k-NN | `train_knn.ipynb` | k = 6 |
-| TabPFN | `train_tabpfn.ipynb` | Pretrained baseline |
-| FFNN | `train_neural_network.ipynb` | [128, 128, 128], dropout 0.2 |
-| **MTL (selected)** | **`train_multi_task_learning.ipynb`** | **[128, 128, 128, 128], 2 shared layers** |
-| FFNN + attention | `train_neural_network_attention.ipynb` | d256, 8 heads, 3 layers |
-| MTL + attention | `train_multi_task_learning_attention.ipynb` | d128, 8 heads, 2 layers |
+### Step 4 — Fill ocean gaps (neural network imputation)
 
-### Run all models at once
+> **Run from a terminal** (GPU recommended):
+> ```bash
+> python scripts/harmonize_ocean_gaps.py
+> python scripts/build_masked_model_features.py
+> ```
+>
+> Or use the notebook: `notebooks/nn_feature_cross_imputation.ipynb`
 
-```bash
-bash notebooks/run_all_models.sh            # submit all SLURM jobs
-bash notebooks/run_all_models.sh --list     # dry-run: print job names
-bash notebooks/run_all_models.sh --local    # run sequentially (no SLURM)
-bash notebooks/run_all_models.sh --trees-only   # CPU models only
-bash notebooks/run_all_models.sh --gpu-only     # GPU models only
-```
+Some environmental layers have missing values over parts of the ocean
+(for example, ocean colour is missing under persistent cloud cover or sea ice).
+This step fills those gaps using a neural network that learns
+relationships between the environmental variables. The method is
+described in the paper (Section 2.1) and Supporting Information (Text S1).
 
-### Feature variants
+### Step 5 — Train models and produce maps
 
-| Variant | Columns | Used by |
-|---------|---------|---------|
-| `values_only` | 113 NN-imputed values | Trees, kNN, TabPFN, FFNN, MTL |
-| `attention` | 226 = 113 values + 113 missingness masks | FFNN+attention, MTL+attention |
+> **Notebooks:** any of the `notebooks/train_*.ipynb` files, **or**
+> submit all at once with:
+> ```bash
+> bash notebooks/run_all_models.sh
+> ```
 
-The `run_all_models.sh` script sets the correct variant per model automatically.
+Each training notebook:
+1. Loads the prepared feature tables from Steps 2–4
+2. Splits the data into training (75%) and testing (25%) sets
+3. Trains the model
+4. Evaluates performance (error metrics, scatter plots)
+5. Predicts MAR at every ocean grid cell and saves a global map
 
 ---
 
-## Key Figures
+## What each model is and where to find it
 
-The notebooks and scripts produce the following key outputs under `data/output/`:
+| Model | What it is | Notebook | Key setting |
+|-------|------------|----------|-------------|
+| **Random Forest** | An ensemble of many decision trees that each vote on the prediction | `train_tree_based_models.ipynb` | 700 trees |
+| **XGBoost** | A boosted tree model where each tree corrects the mistakes of the previous one | `train_tree_based_models.ipynb` | 1000 trees |
+| **CatBoost** | A variant of boosted trees designed for categorical and numerical data | `train_tree_based_models.ipynb` | 1000 trees |
+| **k-NN** | Predicts MAR by averaging the k nearest measurement sites in feature space | `train_knn.ipynb` | k = 6 neighbours |
+| **TabPFN** | A pre-trained neural network for tabular data; no hyperparameter tuning needed | `train_tabpfn.ipynb` | Default settings |
+| **FFNN** | A feed-forward (fully connected) neural network | `train_neural_network.ipynb` | 3 hidden layers, 128 neurons each |
+| **MTL ★** | **Selected model.** A multi-task learning neural network that predicts MAR and TOC simultaneously, sharing information between both tasks | `train_multi_task_learning.ipynb` | 4 hidden layers (128 neurons), first 2 shared |
+| **FFNN + attention** | A neural network with an attention mechanism that can weigh the importance of each input feature | `train_neural_network_attention.ipynb` | 3 attention layers |
+| **MTL + attention** | Combines multi-task learning with the attention mechanism | `train_multi_task_learning_attention.ipynb` | 2 attention layers |
 
-| Figure | Description | Location |
-|--------|-------------|----------|
-| Global MAR prediction maps | Robinson-projection maps for each model | `data/output/predictionmaps_SedRate/paper_table2/maps_paper_png/` |
-| Train/test scatter plots | Measured vs. predicted MAR | `data/output/predictionmaps_SedRate/paper_table2/scatters/` |
-| Hyperparameter optimization | Test MAE, CC, R² vs. tree count / architecture | `data/output/predictionmaps_SedRate/hyperparameter_optimization/` |
-| MC-dropout uncertainty | Model uncertainty at each grid cell | Generated by MTL notebook |
-| Information gain map | KL divergence identifying high-value sampling sites | Generated by MTL notebook |
-| TOC comparison | MTL vs. nn-toc model differences | Generated by MTL notebook |
+> **Which model should I use?** For the best global MAR map, use the **MTL** model
+> (`train_multi_task_learning.ipynb`). It was selected because it has strong
+> prediction accuracy *and* its global sediment budget (28.1 Pg yr⁻¹) falls
+> within the independent particle-flux compilation range (17.6–32.2 Pg yr⁻¹).
 
 ---
 
-## Retraining with New Data
+## What outputs and figures are produced
 
-**Full guide:** [`docs/RETRAINING_WITH_NEW_DATA.md`](docs/RETRAINING_WITH_NEW_DATA.md)
+After running the training notebooks, you will find the following under `data/output/`:
 
-### Short version (Path A — all paper models)
+| Output | What it shows | Where to find it |
+|--------|---------------|------------------|
+| **Global MAR maps** | Robinson-projection world maps of predicted MAR for each model (PNG images) | `data/output/predictionmaps_SedRate/paper_table2/maps_paper_png/` |
+| **Scatter plots** | Measured vs. predicted MAR for training and testing data (how well each model fits) | `data/output/predictionmaps_SedRate/paper_table2/scatters/` |
+| **Hyperparameter curves** | How model performance changes as settings are tuned (e.g., number of trees) | `data/output/predictionmaps_SedRate/hyperparameter_optimization/` |
+| **Raw prediction grids** | NumPy (`.npy`) arrays of the global prediction — useful for further analysis | `data/output/predictionmaps_SedRate/paper_table2/` |
+| **Model uncertainty** | MC-dropout uncertainty and information-gain maps (produced by the MTL notebook) | Saved by the MTL notebook |
+| **Performance metrics** | Numeric results: MAE, correlation coefficient, R², global sediment budget | `data/output/model_metrics/` and printed inside each notebook |
 
-When you have new MAR observations or updated environmental rasters:
+---
 
-```bash
-# 1. Rebuild labels (edit and run the collection notebook)
-#    notebooks/collect_SR_MAR_datapoints.ipynb
+## How to retrain the models with new data
 
-# 2. Rebuild site features (run the CS and DO feature notebooks)
-#    notebooks/create_training_features_CS.ipynb
-#    notebooks/create_training_features_DO.ipynb
+If you have **new sediment-core measurements** (new MAR or TOC values),
+or if any of the **environmental raster layers have been updated**,
+follow this recipe:
 
-# 3. Rebuild global grids (if rasters changed)
-#    notebooks/Make_Global_Features.ipynb
+### Recipe: Retrain everything with new data
 
-# 4. Re-run NN ocean-gap imputation (GPU recommended)
-python scripts/harmonize_ocean_gaps.py
-python scripts/build_masked_model_features.py
+1. **Update the observation tables.** Add your new measurements to the
+   raw label files, then re-run `notebooks/collect_SR_MAR_datapoints.ipynb`
+   to rebuild the clean observation tables.
 
-# 5. Train everything at paper hyperparameters
-bash notebooks/run_all_models.sh
+2. **Rebuild the site features.** Run
+   `notebooks/create_training_features_CS.ipynb` and
+   `notebooks/create_training_features_DO.ipynb`
+   so each site gets the correct environmental values.
 
-# 6. Inspect results
-ls data/output/predictionmaps_SedRate/
-```
+3. **Rebuild the global grids** *(only if rasters changed).* Run
+   `notebooks/Make_Global_Features.ipynb`.
 
-### Reproduce manuscript Table 2 (same data, no retraining)
+4. **Re-fill ocean gaps.** Open a terminal and run:
+   ```bash
+   python scripts/harmonize_ocean_gaps.py
+   python scripts/build_masked_model_features.py
+   ```
+   This is the most time-consuming step; a GPU is recommended.
+
+5. **Retrain all models.** Either:
+   - Open each `train_*.ipynb` notebook and run it, **or**
+   - Submit all jobs to a computing cluster in one command:
+     ```bash
+     bash notebooks/run_all_models.sh
+     ```
+
+6. **Check results.** Open the scatter plots and maps in `data/output/`.
+
+> **Detailed guide:** [`docs/RETRAINING_WITH_NEW_DATA.md`](docs/RETRAINING_WITH_NEW_DATA.md)
+> contains the full operator notes with SLURM commands and troubleshooting.
+
+### Shortcut: Reproduce the exact paper results without retraining
+
+If you just want the published Table 2 products (same data, same models):
 
 ```bash
 python notebooks/reproduce_paper_table2.py
@@ -305,62 +359,65 @@ python notebooks/reproduce_paper_table2.py
 
 ---
 
-## Lightweight Pipeline
+## Quick-update pipeline
 
-For quick updates (trees/kNN + optional DNN) without running all model families:
+If you only want to **add a small number of new cores** and quickly
+retrain the tree-based models (Random Forest, XGBoost, CatBoost, k-NN),
+there is a simplified pipeline that does not require re-running all
+the notebooks:
 
 ```bash
-# Append new observation points
+# 1. Add new observations (original data files are not modified)
 python pipeline/add_data.py --dataset MAR_CS --csv new_points.csv
 
-# Full pipeline: features → HP sweeps → train → maps
+# 2. Retrain models and produce maps (one command)
 python pipeline/run_pipeline.py
-
-# Faster: use existing features, skip HP sweep
-python pipeline/run_pipeline.py --use-existing-features --skip-hp-sweep
-
-# Include DNN
-python pipeline/run_pipeline.py --use-existing-features --dnn --dnn-arch mlp
-
-# SLURM
-sbatch pipeline/slurm_pipeline.sbatch
 ```
 
-| Flag | Description |
-|------|-------------|
-| `--target {MAR,TOC}` | Process only MAR or TOC (default: both) |
-| `--models rf xgb cb knn` | Select tree/kNN models |
-| `--skip-hp-sweep` | Use default hyperparameters |
-| `--skip-maps` | Skip global map generation |
-| `--use-existing-features` | Read from `data/interim/` |
-| `--dnn` | Include DNN training |
-| `--dnn-arch {mlp,attention}` | DNN architecture |
-| `--mc-samples N` | MC-dropout samples (default: 100) |
+This pipeline:
+- Extracts features at the new sites
+- Runs a hyperparameter search (tests different model settings to find the best)
+- Trains the selected models
+- Produces new global prediction maps
 
-Pipeline outputs go to `pipeline/output/` (separate from the main `data/output/`).
+Results go into `pipeline/output/` (separate from the main results in `data/output/`).
 
-See [`pipeline/README.md`](pipeline/README.md) for details.
+Common options:
+
+| Option | What it does |
+|--------|--------------|
+| `--use-existing-features` | Skip feature extraction if the environmental grids have not changed (faster) |
+| `--skip-hp-sweep` | Use the published model settings instead of searching for new ones |
+| `--dnn` | Also train a neural network (off by default in the quick pipeline) |
+| `--target MAR` | Retrain only the MAR models (skip TOC) |
+
+See [`pipeline/README.md`](pipeline/README.md) for all options.
 
 ---
 
-## Reproducibility Notes
+## Notes on reproducibility
 
-- **Random seed:** All models use seed 42 for train/test splitting and weight initialization.
-- **GPU dependence:** Neural network results were produced on NVIDIA H100 GPUs.
-  TensorFloat-32 (TF32) is used by default on H100. For closer cross-GPU agreement,
-  disable TF32:
-  ```python
-  torch.backends.cuda.matmul.allow_tf32 = False
-  torch.backends.cudnn.allow_tf32 = False
-  ```
-- **Feature variant:** Set `MASKED_FEATURE_VARIANT=values_only` for standard models
-  or `attention` for attention-based models. `run_all_models.sh` handles this automatically.
+- **Identical results** require the same hardware. The neural network
+  results in the paper were produced on **NVIDIA H100 GPUs**. Running on
+  a different GPU (e.g., V100 or A100) may give slightly different numbers
+  due to differences in floating-point arithmetic.
+
+- **Random seed:** All train/test splits and model initialisations use a
+  fixed random seed (42), so re-running on the same hardware gives the same
+  output.
+
+- **Tree-based models** (Random Forest, XGBoost, CatBoost, k-NN) are
+  hardware-independent and will produce identical results on any machine.
 
 ---
 
 ## License
 
-This project is licensed under the **MIT License**.
+This project is licensed under the **MIT License** — you are free to use,
+modify, and redistribute the code. See the full text below.
+
+<details>
+<summary>Full MIT License text</summary>
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -379,3 +436,4 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+</details>
