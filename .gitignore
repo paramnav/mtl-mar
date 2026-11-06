@@ -1,6 +1,9 @@
 # Data folder (large files — downloaded from Zenodo)
 data/
 
+# Local archive of old notebooks / artifacts (not for public repo)
+_archive/
+
 # Python bytecode
 __pycache__/
 *.py[cod]
