@@ -2,6 +2,11 @@
 
 [![DOI](https://img.shields.io/badge/DOI-10.5281%2Fzenodo.18591773-blue)](https://doi.org/10.5281/zenodo.18591773)
 
+<p align="center">
+  <img src="docs/figs/mar_prediction_mtl.png" alt="Global seafloor mass accumulation rate (MAR) predicted by the selected multi-task learning model" width="90%">
+</p>
+<p align="center"><em>Global seafloor sediment mass accumulation rate (MAR) from the selected multi-task learning model.</em></p>
+
 **Companion code for:**
 > Parameswaran, N., Burwicz-Galerne, E., Gonzalez, E., Braack, M., & Wallmann, K.
 > *Global Prediction of Mass Accumulation Rates of Sediments and Organic Carbon Turnover Using Multi-Task Learning.*
