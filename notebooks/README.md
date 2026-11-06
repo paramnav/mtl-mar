@@ -102,7 +102,18 @@ NN-imputed products are resolved in this order:
 1. `mtl-mar/data/interim/.../*_men_masked`
 2. fallback: sibling `nn4sedratetoc/data/interim/.../*_men_masked`
 
+## Explainability notebooks
+
+| Notebook | Content |
+|----------|---------|
+| `explain_shap_values.ipynb` | SHAP feature-importance rankings, beeswarm plots, cross-model comparison |
+| `explain_information_gain.ipynb` | MC-dropout information gain, uncertainty & overconfidence maps |
+
+These load pre-computed outputs from `nn4sedratetoc/results/` and
+`nn4sedratetoc/docs_paper2/figs/`. Reproduction instructions are at the
+bottom of each notebook.
+
 ## Archive
 
-`_archive/` holds SHAP/InfoGain/explain notebooks, reproduce scripts, and other
+`_archive/` holds older SHAP/InfoGain/explain notebooks, reproduce scripts, and other
 extras moved out of the publication path. Nothing was deleted.
