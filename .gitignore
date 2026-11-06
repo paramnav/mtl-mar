@@ -3,6 +3,7 @@ data/
 
 # Local archive of old notebooks / artifacts (not for public repo)
 _archive/
+notebooks/_archive/
 
 # Python bytecode
 __pycache__/

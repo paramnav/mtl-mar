@@ -107,7 +107,7 @@ NN-imputed products are resolved in this order:
 | Notebook | Content |
 |----------|---------|
 | `explain_shap_values.ipynb` | SHAP feature-importance rankings, beeswarm plots, cross-model comparison |
-| `explain_information_gain.ipynb` | MC-dropout information gain, uncertainty & overconfidence maps |
+| `information_gain.ipynb` | MC-dropout information gain, uncertainty & overconfidence maps |
 
 These load pre-computed outputs from `nn4sedratetoc/results/` and
 `nn4sedratetoc/docs_paper2/figs/`. Reproduction instructions are at the
