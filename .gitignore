@@ -60,3 +60,8 @@ notebooks/errfiles/
 
 # CatBoost artifacts
 catboost_info/
+
+# Internal helper scripts (not needed by external users)
+notebooks/reproduce_paper_table2.py
+notebooks/paper_train_runtime.py
+notebooks/paper_results_display.py

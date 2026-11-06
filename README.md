@@ -106,8 +106,6 @@ be opened in Jupyter and run cell by cell (or all at once).
 
 **Helper files** (you do not need to open these — the notebooks use them automatically):
 - `run_all_models.sh` — a shell script that submits all training jobs to a computing cluster at once
-- `paper_train_runtime.py`, `paper_results_display.py` — shared code used by the training notebooks
-- `reproduce_paper_table2.py` — reinstalls the exact Table 2 results from saved model files
 - `batchfiles/` — individual cluster job scripts for each model
 
 ### What is in `scripts/`?
